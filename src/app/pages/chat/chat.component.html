@@ -1,0 +1,214 @@
+<div class="chat-container">
+    <!-- Bubble Mode UI -->
+    <div class="bubble-container" *ngIf="viewMode === 'bubble'" (mousedown)="onMouseDown($event)"
+        (click)="handleBubbleClick($event)">
+        <div class="bubble-inner">
+            <div class="bubble-avatar">
+                {{ currentUser.charAt(0).toUpperCase() }}
+            </div>
+        </div>
+        <div class="bubble-badge" *ngIf="unreadCount > 0">{{ unreadCount }}</div>
+    </div>
+
+    <!-- Chat Mode UI (Hidden in Bubble Mode) -->
+    <div class="chat-interface" [class.hidden]="viewMode === 'bubble'">
+        <!-- Call Page Overlay -->
+        <div class="call-page-overlay" *ngIf="showCallPage">
+            <div class="call-page-content">
+                <div class="call-header">
+                    <h2>{{ currentGroup }}</h2>
+                    <p class="call-status">{{ callStatus === 'calling' ? 'Calling...' : callStatus === 'connecting' ?
+                        'Connecting...' : 'Connected' }}</p>
+                </div>
+
+                <div class="call-participants">
+                    <!-- Current User Avatar - always show when on call page -->
+                    <div class="participant-avatar">
+                        <div class="avatar-circle">
+                            {{ currentUser.charAt(0).toUpperCase() }}
+                        </div>
+                        <p class="participant-name">You</p>
+                    </div>
+
+                    <!-- Other Participants - only show when call is connected (not just calling) -->
+                    <div class="participant-avatar" *ngFor="let user of activeUsers">
+                        <div class="avatar-circle" *ngIf="user.username !== currentUser && callStatus === 'connected'">
+                            {{ user.username.charAt(0).toUpperCase() }}
+                        </div>
+                        <p class="participant-name" *ngIf="user.username !== currentUser && callStatus === 'connected'">
+                            {{ user.username }}</p>
+                    </div>
+                </div>
+
+                <div class="call-controls">
+                    <button class="end-call-btn-large" (click)="endCall()">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                            <path
+                                d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08c-.18-.17-.29-.42-.29-.70 0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.68-1.36-2.66-1.85-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z" />
+                        </svg>
+                        End Call
+                    </button>
+                </div>
+            </div>
+            <audio [srcObject]="remoteStream" autoplay *ngIf="remoteStream"></audio>
+        </div>
+
+        <!-- Drag handle for floating mode -->
+        <div class="floating-drag-handle">
+            <div class="drag-handle-content" *ngIf="viewMode === 'chat'">
+                <span class="drag-title">Chat</span>
+                <button class="control-btn minimize-btn" (click)="collapseBubble()" title="Minimize to Bubble">
+                    _
+                </button>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar" [class.collapsed]="!showActiveUsers">
+            <div class="group-info">
+                <div class="group-header">
+                    <div *ngIf="showActiveUsers">
+                        <h2>{{ currentGroup }}</h2>
+                        <div class="passcode-container" *ngIf="currentPasscode">
+                            <span>Passcode: <strong>{{ currentPasscode }}</strong></span>
+                            <button class="copy-btn" (click)="copyPasscode()" title="Copy Passcode">
+                                📋
+                            </button>
+                        </div>
+                        <p>Logged in as: <strong>{{ currentUser }}</strong></p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="toggle-btn" (click)="toggleActiveUsers()"
+                            [title]="showActiveUsers ? 'Collapse Sidebar' : 'Expand Sidebar'">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"
+                                [style.transform]="showActiveUsers ? 'rotate(0deg)' : 'rotate(180deg)'">
+                                <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+                            </svg>
+                        </button>
+                        <button class="leave-btn" (click)="leaveGroup()" title="Leave Group" *ngIf="showActiveUsers">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                <path
+                                    d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
+                            </svg>
+                        </button>
+                        <!-- Floating chat toggle button (Electron only) -->
+                        <button class="toggle-btn" (click)="toggleFloatingMode()" title="Floating Chat"
+                            *ngIf="showActiveUsers && isElectron">
+                            🗗
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="users-list">
+                <h3 *ngIf="showActiveUsers">Active Users ({{ activeUsers.length }})</h3>
+                <div *ngFor="let user of activeUsers" class="user-item"
+                    [class.current-user]="user.username === currentUser"
+                    [title]="!showActiveUsers ? user.username : ''">
+                    <div class="avatar-wrapper">
+                        <div class="avatar">{{ user.username.charAt(0).toUpperCase() }}</div>
+                        <span class="online-indicator" *ngIf="!showActiveUsers"></span>
+                    </div>
+                    <span *ngIf="showActiveUsers" class="user-name">{{ user.username }}<span
+                            *ngIf="user.username === currentUser"> (You)</span></span>
+                    <span class="online-indicator" *ngIf="showActiveUsers"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main chat area -->
+        <div class="main-chat">
+            <div class="chat-header-bar">
+                <h3>{{ currentGroup }}</h3>
+
+                <!-- Incoming Call Indicator (Inline) -->
+                <div class="inline-call-status" *ngIf="incomingCall && !showCallPage">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="ringing-icon-small">
+                        <path
+                            d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z" />
+                    </svg>
+                    <span class="call-text">{{ incomingCall.callerId }} calling</span>
+                    <span class="participant-count-small">{{ activeUsers.length }}</span>
+                    <button class="inline-decline-btn" (click)="rejectCall()">Decline</button>
+                    <button class="inline-accept-btn" (click)="answerCall()">Join</button>
+                </div>
+
+                <!-- Active Call Indicator (Inline) -->
+                <div class="inline-call-status active" *ngIf="activeCall && !showCallPage">
+                    <span class="pulse-dot-small"></span>
+                    <span class="call-text">In call</span>
+                    <span class="participant-count-small">{{ activeUsers.length }}</span>
+                    <button class="inline-view-btn" (click)="showCallPage = true">View</button>
+                    <button class="inline-end-btn" (click)="endCall()">End</button>
+                </div>
+
+                <button class="call-btn-header" (click)="startCall()" title="Start Voice Call"
+                    *ngIf="!incomingCall && !activeCall">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path
+                            d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z" />
+                    </svg>
+                </button>
+            </div>
+            <div class="messages-area" #scrollContainer>
+                <div *ngFor="let msg of messages" class="message-wrapper" [class.own-message]="msg.user === currentUser"
+                    [class.system-message]="msg.isSystem">
+                    <div class="message-bubble" *ngIf="!msg.isSystem">
+                        <div class="message-info">
+                            <span class="sender">{{ msg.user }}</span>
+                            <span class="time">{{ msg.time | date:'shortTime' }}</span>
+                        </div>
+                        <div class="message-content">
+                            <img *ngIf="msg.attachment" [src]="msg.attachment" class="message-image" alt="Attachment">
+                            <div class="message-text" *ngIf="msg.text">{{ msg.text }}</div>
+                        </div>
+                    </div>
+                    <div class="system-text" *ngIf="msg.isSystem">{{ msg.text }}</div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <!-- Image Preview -->
+                <div class="image-preview" *ngIf="selectedFilePreview">
+                    <img [src]="selectedFilePreview" alt="Preview">
+                    <button class="remove-attachment" (click)="removeAttachment()">×</button>
+                </div>
+
+                <!-- Emoji Picker -->
+                <div class="emoji-picker" *ngIf="showEmojiPicker">
+                    <div class="emoji-grid">
+                        <span *ngFor="let emoji of emojis" (click)="addEmoji(emoji)" class="emoji-item">{{ emoji
+                            }}</span>
+                    </div>
+                </div>
+
+                <div class="input-controls">
+                    <button class="attach-btn" (click)="fileInput.click()" title="Attach Photo">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                            <path
+                                d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z" />
+                        </svg>
+                    </button>
+                    <input type="file" #fileInput (change)="onFileSelected($event)" accept="image/*"
+                        style="display: none;">
+
+                    <button class="emoji-btn" (click)="toggleEmojiPicker()" title="Add Emoji">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                            <path
+                                d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" />
+                        </svg>
+                    </button>
+                </div>
+
+                <input type="text" [(ngModel)]="newMessage" (keyup.enter)="sendMessage()"
+                    placeholder="Type a message..." />
+
+                <button class="send-btn" (click)="sendMessage()"
+                    [disabled]="!newMessage.trim() && !selectedFilePreview">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
