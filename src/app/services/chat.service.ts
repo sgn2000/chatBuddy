@@ -33,6 +33,11 @@ export interface UserProfile {
   createdAt: Date;
 }
 
+export interface OfflineUser {
+  email: string;
+  fullName: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -50,6 +55,9 @@ export class ChatService {
 
   private activeUsersSubject = new BehaviorSubject<ActiveUser[]>([]);
   public activeUsers$ = this.activeUsersSubject.asObservable();
+
+  private offlineUsersSubject = new BehaviorSubject<OfflineUser[]>([]);
+  public offlineUsers$ = this.offlineUsersSubject.asObservable();
 
   private userProfileSubject = new BehaviorSubject<UserProfile | null>(null);
   public userProfile$ = this.userProfileSubject.asObservable();
@@ -285,6 +293,9 @@ export class ChatService {
 
         console.log('Filtered active users:', activeUsers.length);
         this.activeUsersSubject.next(activeUsers);
+
+        // Update offline users
+        this.updateOfflineUsers(groupName, activeUsers);
       },
       error: (err) => {
         console.error('Error fetching active users:', err);
@@ -401,6 +412,54 @@ export class ChatService {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
       console.log('Heartbeat stopped');
+    }
+  }
+
+  private async updateOfflineUsers(groupName: string, activeUsers: ActiveUser[]) {
+    try {
+      // Get all group members
+      const groupsRef = collection(this.firestore, 'groups');
+      const q = query(groupsRef, where('groupName', '==', groupName));
+      const snapshot = await import('@angular/fire/firestore').then(m => m.getDocs(q));
+
+      if (!snapshot.empty) {
+        const groupData = snapshot.docs[0].data();
+        const allMembers = groupData['members'] || [];
+        const activeUsernames = activeUsers.map(u => u.username);
+
+        // Filter out active users to get offline member emails
+        const offlineMemberEmails = allMembers.filter((member: string) =>
+          !activeUsernames.includes(member)
+        );
+
+        // Fetch full names for offline members
+        const offlineUsersWithNames: OfflineUser[] = [];
+        const usersRef = collection(this.firestore, 'users');
+
+        for (const email of offlineMemberEmails) {
+          const userQuery = query(usersRef, where('email', '==', email));
+          const userSnapshot = await import('@angular/fire/firestore').then(m => m.getDocs(userQuery));
+
+          if (!userSnapshot.empty) {
+            const userData = userSnapshot.docs[0].data() as UserProfile;
+            offlineUsersWithNames.push({
+              email: email,
+              fullName: userData.fullName || email
+            });
+          } else {
+            // Fallback to email if user profile not found
+            offlineUsersWithNames.push({
+              email: email,
+              fullName: email
+            });
+          }
+        }
+
+        console.log('Offline members:', offlineUsersWithNames.length);
+        this.offlineUsersSubject.next(offlineUsersWithNames);
+      }
+    } catch (err) {
+      console.error('Error updating offline users:', err);
     }
   }
 }

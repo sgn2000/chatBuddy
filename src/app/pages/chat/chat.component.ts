@@ -17,6 +17,7 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
 
   messages: Message[] = [];
   activeUsers: ActiveUser[] = [];
+  offlineUsers: any[] = [];
   currentUser = '';
   currentGroup = '';
   currentPasscode = '';
@@ -38,10 +39,14 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
   incomingCall: Call | null = null;
   activeCall: Call | null = null;
   remoteStream: MediaStream | null = null;
+  remoteScreenShare: MediaStream | null = null;
+  isScreenSharing = false;
   showCallPage = false;
+  showTheatreOverlay = false;
+  theatreNotification: Call | null = null;
   isElectron = false;
 
-  constructor(private chatService: ChatService, private callService: CallService, private router: Router) { }
+  constructor(private chatService: ChatService, public callService: CallService, private router: Router) { }
 
   ngOnInit() {
     // Check if running in Electron
@@ -65,6 +70,7 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
       this.previousMessageCount = msgs.length;
     });
     this.chatService.activeUsers$.subscribe(users => this.activeUsers = users);
+    this.chatService.offlineUsers$.subscribe(users => this.offlineUsers = users);
     this.chatService.getActiveGroups().subscribe(groups => {
       const group = groups.find(g => g.groupName === this.currentGroup);
       if (group) {
@@ -83,11 +89,22 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
 
     // Call Service Subscriptions
     this.callService.callStatus$.subscribe(status => this.callStatus = status);
-    this.callService.incomingCall$.subscribe(call => this.incomingCall = call);
+    this.callService.incomingCall$.subscribe(call => {
+      if (call && call.type === 'theatre') {
+        this.theatreNotification = call;
+      } else {
+        this.incomingCall = call;
+      }
+    });
     this.callService.activeCall$.subscribe(call => this.activeCall = call);
     this.callService.remoteStream$.subscribe(stream => {
       this.remoteStream = stream;
-      // Audio element handling will be done in template or here if needed
+    });
+    this.callService.remoteScreenShare$.subscribe(stream => {
+      this.remoteScreenShare = stream;
+    });
+    this.callService.isScreenSharing$.subscribe(sharing => {
+      this.isScreenSharing = sharing;
     });
 
     // Listen for incoming calls
@@ -164,23 +181,15 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   toggleFloatingMode() {
-    // 1. Set viewMode locally to 'bubble' immediately to trigger the fade-out/hide of chat interface
-    //    and fade-in of bubble (though bubble might look weird in big window for a split second, 
-    //    but better than big UI in small window).
-    //    Actually, if we set it to 'bubble', the chat interface gets .hidden class (opacity 0).
     this.viewMode = 'bubble';
-
-    // 2. Wait for a short duration for the fade-out to be perceptible
     setTimeout(() => {
       if (window.electronAPI) {
         window.electronAPI.toggleFloating();
       }
-    }, 150); // 150ms delay
+    }, 150);
   }
 
   expandBubble() {
-    // For expanding, we want the window to grow FIRST, then show the UI.
-    // So we don't change viewMode locally yet. We let the IPC event 'view-mode-changed' handle it.
     if (window.electronAPI) {
       window.electronAPI.expandBubble();
     }
@@ -237,21 +246,62 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
     }
   }
 
-  answerCall() {
-    if (this.incomingCall) {
+  answerCall(call?: Call) {
+    const callToAnswer = call || this.incomingCall;
+    if (callToAnswer) {
+      this.callService.answerCall(callToAnswer);
       this.showCallPage = true;
-      this.callService.answerCall(this.incomingCall);
+      this.incomingCall = null;
     }
   }
 
   rejectCall() {
-    // For now just hide the incoming call, maybe update status in future
     this.incomingCall = null;
     this.callService.incomingCall$.next(null);
   }
 
-  endCall() {
-    this.callService.endCall();
+  startScreenShare() {
+    this.callService.startScreenShare();
+  }
+
+  stopScreenShare() {
+    this.callService.stopScreenShare();
+  }
+
+  async startTheatreMode() {
+    // Start the call FIRST to create the peer connection
     this.showCallPage = false;
+    this.showTheatreOverlay = false;
+
+    // Start the call to establish peer connection
+    await this.callService.startCall(this.currentGroup, this.currentUser, 'theatre');
+
+    // Wait a bit for the peer connection to be fully initialized
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // NOW start screen sharing (peer connection exists)
+    await this.callService.startScreenShare();
+
+    console.log('Theatre mode started: call established, screen sharing initiated');
+  }
+
+  joinTheatreMode() {
+    if (this.theatreNotification) {
+      this.callService.answerCall(this.theatreNotification);
+      this.showTheatreOverlay = true; // Viewer DOES see the overlay
+      this.showCallPage = false;
+      this.theatreNotification = null;
+    }
+  }
+
+  leaveTheatreMode() {
+    this.endCall();
+    this.showTheatreOverlay = false;
+  }
+
+  endCall() {
+    this.callService.endCall(this.currentUser);
+    this.showCallPage = false;
+    this.showTheatreOverlay = false;
   }
 }

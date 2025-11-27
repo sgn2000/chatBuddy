@@ -12,6 +12,49 @@
 
     <!-- Chat Mode UI (Hidden in Bubble Mode) -->
     <div class="chat-interface" [class.hidden]="viewMode === 'bubble'">
+
+        <!-- Theatre Mode Notification Banner -->
+        <div class="notification-banner" *ngIf="theatreNotification">
+            <div class="banner-content">
+                <span class="banner-icon">🎬</span>
+                <span class="banner-text"><strong>{{ theatreNotification.callerId }}</strong> has started Theatre
+                    Mode!</span>
+            </div>
+            <div class="banner-actions">
+                <button class="banner-btn join" (click)="joinTheatreMode()">Join Now</button>
+                <button class="banner-btn dismiss" (click)="theatreNotification = null">Dismiss</button>
+            </div>
+        </div>
+
+        <!-- Theatre Mode Overlay -->
+        <div class="theatre-overlay" *ngIf="showTheatreOverlay">
+            <div class="theatre-header">
+                <div class="theatre-title">
+                    <span class="cinema-icon">🎦</span>
+                    <h2>Theatre Mode</h2>
+                </div>
+                <div class="theatre-controls">
+                    <div class="viewer-count">
+                        <span>👥</span> {{ activeUsers.length }} Watching
+                    </div>
+                    <button class="leave-theatre-btn" (click)="leaveTheatreMode()">
+                        Leave Theatre
+                    </button>
+                </div>
+            </div>
+
+            <div class="theatre-screen">
+                <!-- Placeholder: only show if no remote screen share -->
+                <div class="screen-placeholder" *ngIf="!remoteScreenShare">
+                    <div class="loader"></div>
+                    <p>Waiting for screen share...</p>
+                </div>
+                <!-- Remote Screen Share: this is what viewers should see -->
+                <video *ngIf="remoteScreenShare" [srcObject]="remoteScreenShare" autoplay class="cinema-screen"></video>
+                <audio *ngIf="remoteScreenShare" [srcObject]="remoteScreenShare" autoplay></audio>
+            </div>
+        </div>
+
         <!-- Call Page Overlay -->
         <div class="call-page-overlay" *ngIf="showCallPage">
             <div class="call-page-content">
@@ -21,7 +64,14 @@
                         'Connecting...' : 'Connected' }}</p>
                 </div>
 
-                <div class="call-participants">
+                <!-- Screen Share Display (if remote screen share exists) -->
+                <div class="screen-share-container" *ngIf="remoteScreenShare">
+                    <h3 style="color: #fff; margin-bottom: 12px; font-size: 1rem;">Screen Share</h3>
+                    <video class="screen-share-video" [srcObject]="remoteScreenShare" autoplay></video>
+                    <audio [srcObject]="remoteScreenShare" autoplay></audio>
+                </div>
+
+                <div class="call-participants" *ngIf="!remoteScreenShare">
                     <!-- Current User Avatar - always show when on call page -->
                     <div class="participant-avatar">
                         <div class="avatar-circle">
@@ -41,6 +91,24 @@
                 </div>
 
                 <div class="call-controls">
+                    <!-- Screen Share Button -->
+                    <button class="screen-share-btn" (click)="startScreenShare()" *ngIf="!isScreenSharing"
+                        title="Share Screen">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path
+                                d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z" />
+                        </svg>
+                        Share Screen
+                    </button>
+                    <button class="stop-share-btn" (click)="stopScreenShare()" *ngIf="isScreenSharing"
+                        title="Stop Sharing">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path
+                                d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z" />
+                        </svg>
+                        Stop Sharing
+                    </button>
+
                     <button class="end-call-btn-large" (click)="endCall()">
                         <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
                             <path
@@ -112,6 +180,19 @@
                             *ngIf="user.username === currentUser"> (You)</span></span>
                     <span class="online-indicator" *ngIf="showActiveUsers"></span>
                 </div>
+
+                <!-- Offline Members Section -->
+                <h3 *ngIf="showActiveUsers && offlineUsers.length > 0" style="margin-top: 24px;">Offline Members ({{
+                    offlineUsers.length }})</h3>
+                <div *ngFor="let user of offlineUsers" class="user-item offline-user"
+                    [title]="!showActiveUsers ? user.fullName : ''">
+                    <div class="avatar-wrapper">
+                        <div class="avatar">{{ user.fullName.charAt(0).toUpperCase() }}</div>
+                        <span class="offline-indicator" *ngIf="!showActiveUsers"></span>
+                    </div>
+                    <span *ngIf="showActiveUsers" class="user-name">{{ user.fullName }}</span>
+                    <span class="offline-indicator" *ngIf="showActiveUsers"></span>
+                </div>
             </div>
         </div>
 
@@ -141,6 +222,7 @@
                     <button class="inline-end-btn" (click)="endCall()">End</button>
                 </div>
 
+                <!-- Call Button -->
                 <button class="call-btn-header" (click)="startCall()" title="Start Voice Call"
                     *ngIf="!incomingCall && !activeCall">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
@@ -148,7 +230,28 @@
                             d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z" />
                     </svg>
                 </button>
+
+                <!-- Theatre Mode Button -->
+                <button class="theatre-btn-header" (click)="startTheatreMode()" title="Theatre Mode - Share Screen"
+                    *ngIf="!incomingCall && !activeCall && !isScreenSharing">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path
+                            d="M18 3v2h-2V3H8v2H6V3H4v18h2v-2h2v2h8v-2h2v2h2V3h-2zM8 17H6v-2h2v2zm0-4H6v-2h2v2zm0-4H6V7h2v2zm10 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z" />
+                        <path d="M10 8h4v8h-4z" opacity="0.6" />
+                    </svg>
+                </button>
+
+                <!-- Stop Sharing Button (Visible to Sharer) -->
+                <button class="stop-share-btn-header" (click)="stopScreenShare()" title="Stop Sharing"
+                    *ngIf="isScreenSharing"
+                    style="background-color: #ff4444; color: white; border: none; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path
+                            d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z" />
+                    </svg>
+                </button>
             </div>
+
             <div class="messages-area" #scrollContainer>
                 <div *ngFor="let msg of messages" class="message-wrapper" [class.own-message]="msg.user === currentUser"
                     [class.system-message]="msg.isSystem">
@@ -176,7 +279,8 @@
                 <!-- Emoji Picker -->
                 <div class="emoji-picker" *ngIf="showEmojiPicker">
                     <div class="emoji-grid">
-                        <span *ngFor="let emoji of emojis" (click)="addEmoji(emoji)" class="emoji-item">{{ emoji
+                        <span *ngFor="let emoji of emojis" (click)="addEmoji(emoji)" class="emoji-item">{{
+                            emoji
                             }}</span>
                     </div>
                 </div>
