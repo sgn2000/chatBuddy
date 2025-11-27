@@ -1998,3 +1998,76 @@
         transform: rotate(360deg);
     }
 }
+
+/* Mobile Compatibility Styles */
+
+/* Hamburger Button */
+.hamburger-btn {
+    display: none;
+    /* Hidden on desktop */
+    background: none;
+    border: none;
+    color: #b9bbbe;
+    cursor: pointer;
+    padding: 8px;
+    margin-right: 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.hamburger-btn:hover {
+    color: #fff;
+    background: rgba(114, 137, 218, 0.1);
+}
+
+/* Sidebar Backdrop */
+.sidebar-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    backdrop-filter: blur(3px);
+    animation: fadeIn 0.2s ease-out;
+}
+
+@media (max-width: 768px) {
+    .hamburger-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 280px;
+        z-index: 1001;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    /* Adjust chat header to accommodate hamburger */
+    .chat-header-bar {
+        padding-left: 8px;
+    }
+
+    /* Ensure main chat takes full width */
+    .main-chat {
+        width: 100%;
+    }
+
+    /* Hide the electron toggle button on mobile if it takes too much space */
+    .toggle-btn {
+        display: none;
+    }
+}

@@ -126,130 +126,55 @@
             <div class="drag-handle-content" *ngIf="viewMode === 'chat'">
                 <span class="drag-title">Chat</span>
                 <button class="control-btn minimize-btn" (click)="collapseBubble()" title="Minimize to Bubble">
-                    _
-                </button>
-            </div>
-        </div>
-
-        <!-- Sidebar -->
-        <div class="sidebar" [class.collapsed]="!showActiveUsers">
-            <div class="group-info">
-                <div class="group-header">
-                    <div *ngIf="showActiveUsers">
-                        <h2>{{ currentGroup }}</h2>
-                        <div class="passcode-container" *ngIf="currentPasscode">
-                            <span>Passcode: <strong>{{ currentPasscode }}</strong></span>
-                            <button class="copy-btn" (click)="copyPasscode()" title="Copy Passcode">
-                                📋
-                            </button>
-                        </div>
-                        <p>Logged in as: <strong>{{ currentUser }}</strong></p>
+                    <!-- Incoming Call Indicator (Inline) -->
+                    <div class="inline-call-status" *ngIf="incomingCall && !showCallPage">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="ringing-icon-small">
+                            <path
+                                d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z" />
+                        </svg>
+                        <span class="call-text">{{ incomingCall.callerId }} calling</span>
+                        <span class="participant-count-small">{{ activeUsers.length }}</span>
+                        <button class="inline-decline-btn" (click)="rejectCall()">Decline</button>
+                        <button class="inline-accept-btn" (click)="answerCall()">Join</button>
                     </div>
-                    <div class="header-actions">
-                        <button class="toggle-btn" (click)="toggleActiveUsers()"
-                            [title]="showActiveUsers ? 'Collapse Sidebar' : 'Expand Sidebar'">
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"
-                                [style.transform]="showActiveUsers ? 'rotate(0deg)' : 'rotate(180deg)'">
-                                <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
-                            </svg>
-                        </button>
-                        <button class="leave-btn" (click)="leaveGroup()" title="Leave Group" *ngIf="showActiveUsers">
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                                <path
-                                    d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
-                            </svg>
-                        </button>
-                        <!-- Floating chat toggle button (Electron only) -->
-                        <button class="toggle-btn" (click)="toggleFloatingMode()" title="Floating Chat"
-                            *ngIf="showActiveUsers && isElectron">
-                            🗗
-                        </button>
+
+                    <!-- Active Call Indicator (Inline) -->
+                    <div class="inline-call-status active" *ngIf="activeCall && !showCallPage">
+                        <span class="pulse-dot-small"></span>
+                        <span class="call-text">In call</span>
+                        <span class="participant-count-small">{{ activeUsers.length }}</span>
+                        <button class="inline-view-btn" (click)="showCallPage = true">View</button>
+                        <button class="inline-end-btn" (click)="endCall()">End</button>
                     </div>
-                </div>
-            </div>
-            <div class="users-list">
-                <h3 *ngIf="showActiveUsers">Active Users ({{ activeUsers.length }})</h3>
-                <div *ngFor="let user of activeUsers" class="user-item"
-                    [class.current-user]="user.username === currentUser"
-                    [title]="!showActiveUsers ? user.username : ''">
-                    <div class="avatar-wrapper">
-                        <div class="avatar">{{ user.username.charAt(0).toUpperCase() }}</div>
-                        <span class="online-indicator" *ngIf="!showActiveUsers"></span>
-                    </div>
-                    <span *ngIf="showActiveUsers" class="user-name">{{ user.username }}<span
-                            *ngIf="user.username === currentUser"> (You)</span></span>
-                    <span class="online-indicator" *ngIf="showActiveUsers"></span>
-                </div>
 
-                <!-- Offline Members Section -->
-                <h3 *ngIf="showActiveUsers && offlineUsers.length > 0" style="margin-top: 24px;">Offline Members ({{
-                    offlineUsers.length }})</h3>
-                <div *ngFor="let user of offlineUsers" class="user-item offline-user"
-                    [title]="!showActiveUsers ? user.fullName : ''">
-                    <div class="avatar-wrapper">
-                        <div class="avatar">{{ user.fullName.charAt(0).toUpperCase() }}</div>
-                        <span class="offline-indicator" *ngIf="!showActiveUsers"></span>
-                    </div>
-                    <span *ngIf="showActiveUsers" class="user-name">{{ user.fullName }}</span>
-                    <span class="offline-indicator" *ngIf="showActiveUsers"></span>
-                </div>
-            </div>
-        </div>
+                    <!-- Call Button -->
+                    <button class="call-btn-header" (click)="startCall()" title="Start Voice Call"
+                        *ngIf="!incomingCall && !activeCall">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path
+                                d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z" />
+                        </svg>
+                    </button>
 
-        <!-- Main chat area -->
-        <div class="main-chat">
-            <div class="chat-header-bar">
-                <h3>{{ currentGroup }}</h3>
+                    <!-- Theatre Mode Button -->
+                    <button class="theatre-btn-header" (click)="startTheatreMode()" title="Theatre Mode - Share Screen"
+                        *ngIf="!incomingCall && !activeCall && !isScreenSharing">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path
+                                d="M18 3v2h-2V3H8v2H6V3H4v18h2v-2h2v2h8v-2h2v2h2V3h-2zM8 17H6v-2h2v2zm0-4H6v-2h2v2zm0-4H6V7h2v2zm10 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z" />
+                            <path d="M10 8h4v8h-4z" opacity="0.6" />
+                        </svg>
+                    </button>
 
-                <!-- Incoming Call Indicator (Inline) -->
-                <div class="inline-call-status" *ngIf="incomingCall && !showCallPage">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="ringing-icon-small">
-                        <path
-                            d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z" />
-                    </svg>
-                    <span class="call-text">{{ incomingCall.callerId }} calling</span>
-                    <span class="participant-count-small">{{ activeUsers.length }}</span>
-                    <button class="inline-decline-btn" (click)="rejectCall()">Decline</button>
-                    <button class="inline-accept-btn" (click)="answerCall()">Join</button>
-                </div>
-
-                <!-- Active Call Indicator (Inline) -->
-                <div class="inline-call-status active" *ngIf="activeCall && !showCallPage">
-                    <span class="pulse-dot-small"></span>
-                    <span class="call-text">In call</span>
-                    <span class="participant-count-small">{{ activeUsers.length }}</span>
-                    <button class="inline-view-btn" (click)="showCallPage = true">View</button>
-                    <button class="inline-end-btn" (click)="endCall()">End</button>
-                </div>
-
-                <!-- Call Button -->
-                <button class="call-btn-header" (click)="startCall()" title="Start Voice Call"
-                    *ngIf="!incomingCall && !activeCall">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                        <path
-                            d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z" />
-                    </svg>
-                </button>
-
-                <!-- Theatre Mode Button -->
-                <button class="theatre-btn-header" (click)="startTheatreMode()" title="Theatre Mode - Share Screen"
-                    *ngIf="!incomingCall && !activeCall && !isScreenSharing">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                        <path
-                            d="M18 3v2h-2V3H8v2H6V3H4v18h2v-2h2v2h8v-2h2v2h2V3h-2zM8 17H6v-2h2v2zm0-4H6v-2h2v2zm0-4H6V7h2v2zm10 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z" />
-                        <path d="M10 8h4v8h-4z" opacity="0.6" />
-                    </svg>
-                </button>
-
-                <!-- Stop Sharing Button (Visible to Sharer) -->
-                <button class="stop-share-btn-header" (click)="stopScreenShare()" title="Stop Sharing"
-                    *ngIf="isScreenSharing"
-                    style="background-color: #ff4444; color: white; border: none; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                        <path
-                            d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z" />
-                    </svg>
-                </button>
+                    <!-- Stop Sharing Button (Visible to Sharer) -->
+                    <button class="stop-share-btn-header" (click)="stopScreenShare()" title="Stop Sharing"
+                        *ngIf="isScreenSharing"
+                        style="background-color: #ff4444; color: white; border: none; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path
+                                d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z" />
+                        </svg>
+                    </button>
             </div>
 
             <div class="messages-area" #scrollContainer>

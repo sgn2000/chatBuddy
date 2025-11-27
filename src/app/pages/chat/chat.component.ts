@@ -45,6 +45,7 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
   showTheatreOverlay = false;
   theatreNotification: Call | null = null;
   isElectron = false;
+  isSidebarOpen = false;
 
   constructor(private chatService: ChatService, public callService: CallService, private router: Router) { }
 
@@ -303,5 +304,13 @@ export class ChatComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.callService.endCall(this.currentUser);
     this.showCallPage = false;
     this.showTheatreOverlay = false;
+  }
+
+  toggleSidebar() {
+    this.isSidebarOpen = !this.isSidebarOpen;
+  }
+
+  closeSidebar() {
+    this.isSidebarOpen = false;
   }
 }
